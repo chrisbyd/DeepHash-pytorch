@@ -9,12 +9,12 @@ import torchvision.datasets as dsets
 
 def config_dataset(config):
     if "cifar" in config["dataset"]:
-        config["topK"] = -1
+        config["topK"] = 54000
         config["n_class"] = 10
     elif config["dataset"] in ["nuswide_21", "nuswide_21_m"]:
         config["topK"] = 5000
         config["n_class"] = 21
-    elif config["dataset"] == "nuswide_81_m":
+    elif config["dataset"] == "nuswide81":
         config["topK"] = 5000
         config["n_class"] = 81
     elif config["dataset"] == "coco":
@@ -33,16 +33,21 @@ def config_dataset(config):
     config["data_path"] = "/dataset/" + config["dataset"] + "/"
     if config["dataset"] == "nuswide_21":
         config["data_path"] = "/dataset/NUS-WIDE/"
-    if config["dataset"] in ["nuswide_21_m", "nuswide_81_m"]:
-        config["data_path"] = "/dataset/nus_wide_m/"
+    if config["dataset"] == "nuswide81":
+        config["data_path"] = "./data/nuswide81/"
     if config["dataset"] == "coco":
         config["data_path"] = "/dataset/COCO_2014/"
     if config["dataset"] == "voc2012":
         config["data_path"] = "/dataset/"
+    if config['dataset'] == 'cifar10':
+        config["data_path"] = "./data/cifar10/"
+    if config['dataset'] == 'imagenet':
+        config["data_path"] = "./data/imagenet/"
+
     config["data"] = {
         "train_set": {"list_path": "./data/" + config["dataset"] + "/train.txt", "batch_size": config["batch_size"]},
-        "database": {"list_path": "./data/" + config["dataset"] + "/database.txt", "batch_size": config["batch_size"]},
-        "test": {"list_path": "./data/" + config["dataset"] + "/test.txt", "batch_size": config["batch_size"]}}
+        "database": {"list_path": "./data/" + config["dataset"] + "/database.txt", "batch_size": config["test_batch_size"]},
+        "test": {"list_path": "./data/" + config["dataset"] + "/test.txt", "batch_size": config["test_batch_size"]}}
     return config
 
 
@@ -75,109 +80,7 @@ def image_transform(resize_size, crop_size, data_set):
                                ])
 
 
-class MyCIFAR10(dsets.CIFAR10):
-    def __getitem__(self, index):
-        img, target = self.data[index], self.targets[index]
-        img = Image.fromarray(img)
-        img = self.transform(img)
-        target = np.eye(10, dtype=np.int8)[np.array(target)]
-        return img, target, index
-
-
-def cifar_dataset(config):
-    batch_size = config["batch_size"]
-
-    train_size = 500
-    test_size = 100
-
-    if config["dataset"] == "cifar10-2":
-        train_size = 5000
-        test_size = 1000
-
-    transform = transforms.Compose([
-        transforms.Resize(config["crop_size"]),
-        transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-    ])
-
-    # Dataset
-    train_dataset = MyCIFAR10(root='/dataset/cifar/',
-                              train=True,
-                              transform=transform,
-                              download=True)
-
-    test_dataset = MyCIFAR10(root='/dataset/cifar/',
-                             train=False,
-                             transform=transform)
-
-    database_dataset = MyCIFAR10(root='/dataset/cifar/',
-                                 train=False,
-                                 transform=transform)
-
-    X = np.concatenate((train_dataset.data, test_dataset.data))
-    L = np.concatenate((np.array(train_dataset.targets), np.array(test_dataset.targets)))
-
-    first = True
-    for label in range(10):
-        index = np.where(L == label)[0]
-
-        N = index.shape[0]
-        perm = np.random.permutation(N)
-        index = index[perm]
-
-        if first:
-            test_index = index[:test_size]
-            train_index = index[test_size: train_size + test_size]
-            database_index = index[train_size + test_size:]
-        else:
-            test_index = np.concatenate((test_index, index[:test_size]))
-            train_index = np.concatenate((train_index, index[test_size: train_size + test_size]))
-            database_index = np.concatenate((database_index, index[train_size + test_size:]))
-        first = False
-
-    if config["dataset"] == "cifar10":
-        # test:1000, train:5000, database:54000
-        pass
-    elif config["dataset"] == "cifar10-1":
-        # test:1000, train:5000, database:59000
-        database_index = np.concatenate((train_index, database_index))
-    elif config["dataset"] == "cifar10-2":
-        # test:10000, train:50000, database:50000
-        database_index = train_index
-
-    train_dataset.data = X[train_index]
-    train_dataset.targets = L[train_index]
-    test_dataset.data = X[test_index]
-    test_dataset.targets = L[test_index]
-    database_dataset.data = X[database_index]
-    database_dataset.targets = L[database_index]
-
-    print("train_dataset", train_dataset.data.shape[0])
-    print("test_dataset", test_dataset.data.shape[0])
-    print("database_dataset", database_dataset.data.shape[0])
-
-    train_loader = torch.utils.data.DataLoader(dataset=train_dataset,
-                                               batch_size=batch_size,
-                                               shuffle=True,
-                                               num_workers=4)
-
-    test_loader = torch.utils.data.DataLoader(dataset=test_dataset,
-                                              batch_size=batch_size,
-                                              shuffle=False,
-                                              num_workers=4)
-
-    database_loader = torch.utils.data.DataLoader(dataset=database_dataset,
-                                                  batch_size=batch_size,
-                                                  shuffle=False,
-                                                  num_workers=4)
-
-    return train_loader, test_loader, database_loader, \
-           train_index.shape[0], test_index.shape[0], database_index.shape[0]
-
-
 def get_data(config):
-    if "cifar" in config["dataset"]:
-        return cifar_dataset(config)
 
     dsets = {}
     dset_loaders = {}
@@ -199,11 +102,17 @@ def get_data(config):
 def compute_result(dataloader, net, device):
     bs, clses = [], []
     net.eval()
-    for img, cls, _ in tqdm(dataloader):
-        clses.append(cls)
-        bs.append((net(img.to(device))).data.cpu())
+    with torch.no_grad():
+        for img, cls, _ in tqdm(dataloader):
+            clses.append(cls)
+            bs.append((net(img.to(device))).data.cpu())
     return torch.cat(bs).sign(), torch.cat(clses)
 
+def sign(x):
+    s = np.sign(x)
+    tmp = s[s == 0]
+    s[s==0] = np.random.choice([-1, 1], tmp.shape)
+    return s
 
 def CalcHammingDist(B1, B2):
     q = B2.shape[1]
@@ -211,9 +120,10 @@ def CalcHammingDist(B1, B2):
     return distH
 
 
-def CalcTopMap(rB, qB, retrievalL, queryL, topk):
+def CalcTopMap(qB, rB, queryL, retrievalL, topk):
     num_query = queryL.shape[0]
     topkmap = 0
+    prec = np.zeros((num_query,2000))
     for iter in tqdm(range(num_query)):
         gnd = (np.dot(queryL[iter, :], retrievalL.transpose()) > 0).astype(np.float32)
         hamm = CalcHammingDist(qB[iter, :], rB)
@@ -226,8 +136,14 @@ def CalcTopMap(rB, qB, retrievalL, queryL, topk):
             continue
         count = np.linspace(1, tsum, tsum)
 
+        prec_gnd = gnd[0:2000]
+        prec_sum = np.cumsum(prec_gnd)
+        return_images = np.arange(1,2001)
+        prec[iter,:] = prec_sum / return_images
         tindex = np.asarray(np.where(tgnd == 1)) + 1.0
         topkmap_ = np.mean(count / (tindex))
         topkmap = topkmap + topkmap_
     topkmap = topkmap / num_query
-    return topkmap
+    cum_prec = np.mean(prec, 0)
+    print(cum_prec)
+    return topkmap, cum_prec

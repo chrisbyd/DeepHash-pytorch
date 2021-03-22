@@ -8,7 +8,8 @@ import time
 import numpy as np
 from scipy.linalg import hadamard  # direct import  hadamrd matrix from scipy
 import random
-
+from validate import validate
+from tqdm import tqdm
 torch.multiprocessing.set_sharing_strategy('file_system')
 
 
@@ -49,7 +50,6 @@ def get_config():
         "device": torch.device("cuda:1"),
         "bit_list": [64],
     }
-    config = config_dataset(config)
     return config
 
 
@@ -125,7 +125,7 @@ def train_val(config, bit):
 
     Best_mAP = 0
 
-    for epoch in range(config["epoch"]):
+    for epoch in tqdm(range(config["epoch"])):
 
         current_time = time.strftime('%H:%M:%S', time.localtime(time.time()))
 
@@ -135,7 +135,7 @@ def train_val(config, bit):
         net.train()
 
         train_loss = 0
-        for image, label, ind in train_loader:
+        for image, label, ind in tqdm(train_loader):
             image = image.to(device)
             label = label.to(device)
 
@@ -154,26 +154,9 @@ def train_val(config, bit):
 
         if (epoch + 1) % config["test_map"] == 0:
             # print("calculating test binary code......")
-            tst_binary, tst_label = compute_result(test_loader, net, device=device)
-
-            # print("calculating dataset binary code.......")\
-            trn_binary, trn_label = compute_result(dataset_loader, net, device=device)
-
-            # print("calculating map.......")
-            mAP = CalcTopMap(trn_binary.numpy(), tst_binary.numpy(), trn_label.numpy(), tst_label.numpy(),
-                             config["topK"])
-
+            mAP = validate(config, bit=bit, epoch_num=epoch, best_map=Best_mAP, net=net)
             if mAP > Best_mAP:
                 Best_mAP = mAP
-
-                if "save_path" in config:
-                    if not os.path.exists(config["save_path"]):
-                        os.makedirs(config["save_path"])
-                    print("save in ", config["save_path"])
-                    np.save(os.path.join(config["save_path"], config["dataset"] + str(mAP) + "-" + "trn_binary.npy"),
-                            trn_binary.numpy())
-                    torch.save(net.state_dict(),
-                               os.path.join(config["save_path"], config["dataset"] + "-" + str(mAP) + "-model.pt"))
             print("%s epoch:%d, bit:%d, dataset:%s, MAP:%.3f, Best MAP: %.3f" % (
                 config["info"], epoch + 1, bit, config["dataset"], mAP, Best_mAP))
             print(config)

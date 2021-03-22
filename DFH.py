@@ -46,7 +46,7 @@ def get_config():
         "device": torch.device("cuda:1"),
         "bit_list": [48],
     }
-    config = config_dataset(config)
+
     return config
 
 
@@ -172,7 +172,7 @@ def train_val(config, bit):
                                os.path.join(config["save_path"], config["dataset"] + "-" + str(mAP) + "-model.pt"))
             print("%s epoch:%d, bit:%d, dataset:%s, MAP:%.3f, Best MAP: %.3f" % (
                 config["info"], epoch + 1, bit, config["dataset"], mAP, Best_mAP))
-            print(config)
+
 
 
 if __name__ == "__main__":

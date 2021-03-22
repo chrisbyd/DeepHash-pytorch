@@ -19,7 +19,7 @@ def get_config():
         "alpha": 0.1,
         # "optimizer": {"type": optim.SGD, "optim_params": {"lr": 0.005, "weight_decay": 10 ** -5}},
         "optimizer": {"type": optim.RMSprop, "optim_params": {"lr": 1e-5, "weight_decay": 10 ** -5}},
-        "info": "[DPSH]",
+        "info": "DPSH",
         "resize_size": 256,
         "crop_size": 224,
         "batch_size": 128,

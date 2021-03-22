@@ -1,0 +1,5 @@
+data/
+*.pyc
+*.sh
+__pycache__
+save/
