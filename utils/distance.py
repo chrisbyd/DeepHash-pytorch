@@ -1,6 +1,6 @@
 import numpy as np
 import sys
-import util
+from utils.tools import sign
 
 
 def norm(x, keepdims=False):
@@ -63,8 +63,8 @@ def distance(x1, x2=None, pair=True, dist_type="euclidean2", ifsign=False):
     if x2 is None:
         x2 = x1
     if ifsign:
-        x1 = util.sign(x1)
-        x2 = util.sign(x2)
+        x1 = sign(x1)
+        x2 = sign(x2)
     if dist_type == 'inner_product':
         return inner_product(x1, x2, pair)
     if pair:
