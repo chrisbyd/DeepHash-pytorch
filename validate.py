@@ -56,16 +56,10 @@ def validate(config, bit, epoch_num, best_map, net =None, if_save_code =1, preco
     max_index = max(index)
     overflow = num_dataset - index_range * 100
     index = index + [max_index + i  for i in range(1,overflow + 1)]
-    print("the length of the index is", len(index))
-    print("the final index is", index[1287])
-    print("the length of the recall array", len(cum_recall))
-    print("the final item of cum_recall", cum_recall[-1])
-    print("the last ten item of idex", index[-10:])
+
     c_prec = cum_prec[index].tolist()
     c_recall = cum_recall[index].tolist()
-    print("the length of the c_recall array", len(c_recall))
-    print("the last recall is",c_recall[-1])
-    print("the last index is",index[-1])
+
 
     results_to_txt([mAP], filename=file_name, model_name=model_name, sheet_name='map')
     results_to_txt(c_prec, filename=file_name, model_name=model_name, sheet_name='prec_cum')

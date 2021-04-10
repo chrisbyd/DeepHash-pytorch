@@ -152,9 +152,11 @@ def CalcTopMap(qB, rB, queryL, retrievalL, topk):
         topkmap_ = np.mean(count / (tindex))
         topkmap = topkmap + topkmap_
     topkmap = topkmap / num_query
-    print("the recall last item is",recall[:,-1])
-    print("arg where ", np.argwhere(recall[:,-1] < 1.0))
+    index = np.argwhere(recall[:, -1] == 1.0)
+    index = index.squeeze()
+    prec = prec[index]
+    recall = recall[index]
     cum_prec = np.mean(prec, 0)
     cum_recall = np.mean(recall, 0)
-    print("the final item of cum recall after mean", cum_recall[-1])
+
     return topkmap, cum_prec , cum_recall
