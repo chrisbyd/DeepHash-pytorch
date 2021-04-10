@@ -3,3 +3,10 @@ data/
 *.sh
 __pycache__
 save/
+*.xml
+.idea/
+*.txt
+*.npy
+idea/
+*.xlsx
+*.csv

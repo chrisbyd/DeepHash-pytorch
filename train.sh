@@ -4,7 +4,7 @@ dataset=cifar10   # "dataset": "nuswide81" "cifar10" "imagenet",
  # LCDSH batch_size=800
  #
 
-model_name=DSH # HashNet.py  PCDH.py LCDSH GreedyHash
+model_name=DSDH # HashNet.py  PCDH.py LCDSH GreedyHash
 bit_list=[16,32,48,64]
 num_epochs=200
 batch_size=800

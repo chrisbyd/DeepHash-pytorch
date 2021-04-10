@@ -122,8 +122,10 @@ def CalcHammingDist(B1, B2):
 
 def CalcTopMap(qB, rB, queryL, retrievalL, topk):
     num_query = queryL.shape[0]
+    num_gallery = retrievalL.shape[0]
     topkmap = 0
-    prec = np.zeros((num_query,2000))
+    prec = np.zeros((num_query,num_gallery))
+    recall = np.zeros((num_query,num_gallery))
     for iter in tqdm(range(num_query)):
         gnd = (np.dot(queryL[iter, :], retrievalL.transpose()) > 0).astype(np.float32)
         hamm = CalcHammingDist(qB[iter, :], rB)
@@ -135,15 +137,24 @@ def CalcTopMap(qB, rB, queryL, retrievalL, topk):
         if tsum == 0:
             continue
         count = np.linspace(1, tsum, tsum)
+        all_sim_num = np.sum(gnd)
 
-        prec_gnd = gnd[0:2000]
-        prec_sum = np.cumsum(prec_gnd)
-        return_images = np.arange(1,2001)
+        prec_gnd = gnd
+        prec_sum = np.cumsum(gnd)
+        return_images = np.arange(1,num_gallery+1)
         prec[iter,:] = prec_sum / return_images
+        recall[iter,:] = prec_sum / all_sim_num
+
+        assert recall[iter, -1] == 1.0
+        assert all_sim_num == prec_sum[-1]
+
         tindex = np.asarray(np.where(tgnd == 1)) + 1.0
         topkmap_ = np.mean(count / (tindex))
         topkmap = topkmap + topkmap_
     topkmap = topkmap / num_query
+    print("the recall last item is",recall[:,-1])
+    print("arg where ", np.argwhere(recall[:,-1] < 1.0))
     cum_prec = np.mean(prec, 0)
-    print(cum_prec)
-    return topkmap, cum_prec
+    cum_recall = np.mean(recall, 0)
+    print("the final item of cum recall after mean", cum_recall[-1])
+    return topkmap, cum_prec , cum_recall

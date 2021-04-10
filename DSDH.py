@@ -56,13 +56,15 @@ class DSDHLoss(torch.nn.Module):
         self.U = torch.zeros(bit, config["num_train"]).float().to(config["device"])
         self.B = torch.zeros(bit, config["num_train"]).float().to(config["device"])
         self.Y = torch.zeros(config["n_class"], config["num_train"]).float().to(config["device"])
+        self.config = config
+        self.bit = bit
 
     def forward(self, u, y, ind, config):
 
         self.U[:, ind] = u.t().data
         self.Y[:, ind] = y.t()
 
-        self.updateBandW(config["device"])
+        self.updateBandW(config["device"], config)
 
         inner_product = u @ self.U * 0.5
         s = (y @ self.Y > 0).float()
@@ -80,11 +82,11 @@ class DSDHLoss(torch.nn.Module):
         loss = likelihood_loss + config["mu"] * cl_loss + config["nu"] * reg_loss
         return loss
 
-    def updateBandW(self, device):
+    def updateBandW(self, device, config):
         B = self.B
         for dit in range(config["dcc_iter"]):
             # W-step
-            W = torch.inverse(B @ B.t() + config["nu"] / config["mu"] * torch.eye(bit).to(device)) @ B @ self.Y.t()
+            W = torch.inverse(B @ B.t() + config["nu"] / config["mu"] * torch.eye(self.bit).to(device)) @ B @ self.Y.t()
 
             for i in range(B.shape[0]):
                 P = W @ self.Y + config["eta"] / config["mu"] * self.U

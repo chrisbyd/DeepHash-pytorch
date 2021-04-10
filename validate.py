@@ -3,10 +3,12 @@ import os
 from utils.tools import compute_result
 from utils.metric import MAPs
 from utils.log_to_excel import results_to_excel
+from utils.log_to_txt import results_to_txt
 from utils.metric import MAPs
 from utils.tools import CalcTopMap, get_data
+import numpy as np
 
-def validate(config, bit, epoch_num, best_map, net =None):
+def validate(config, bit, epoch_num, best_map, net =None, if_save_code =1, precomputed_codes = None):
     device = config["device"]
     if net is None:
         net = config["net"](bit).to(device)
@@ -14,14 +16,29 @@ def validate(config, bit, epoch_num, best_map, net =None):
         net.load_state_dict(torch.load(path))
     net.eval()
     train_loader, test_loader, dataset_loader, num_train, num_test, num_dataset = get_data(config)
+    print("The number of gallery points is",num_dataset)
 
-    query_codes, query_labels = compute_result(test_loader, net, device=device)
+    if precomputed_codes is None:
+        query_codes, query_labels = compute_result(test_loader, net, device=device)
 
-    # print("calculating dataset binary code.......")\
-    gallery_codes, gallery_labels = compute_result(dataset_loader, net, device=device)
+        # print("calculating dataset binary code.......")\
+        gallery_codes, gallery_labels = compute_result(dataset_loader, net, device=device)
+        fname = config['info'] + '_' + config['dataset'] + '_' + str(bit) +'-'+'code.npy'
+        if if_save_code == 1:
+            codes = {"q_codes": query_codes,
+                     'q_labels': query_labels,
+                     'g_codes' : gallery_codes,
+                     "g_labels" : gallery_labels}
+            np.save("./save/"+ fname, codes)
 
-    # print("calculating map.......")
-    mAP, cum_prec = CalcTopMap(query_codes.numpy(), gallery_codes.numpy(), query_labels.numpy(), gallery_labels.numpy(),
+
+    else:
+        query_codes, query_labels, gallery_codes, gallery_labels = precomputed_codes['q_codes'], precomputed_codes['q_labels'], \
+                                                                   precomputed_codes['g_codes'], precomputed_codes['g_labels']
+
+
+        # print("calculating map.......")
+    mAP, cum_prec, cum_recall = CalcTopMap(query_codes.numpy(), gallery_codes.numpy(), query_labels.numpy(), gallery_labels.numpy(),
                                config["topK"])
 
     metric = MAPs(config['topK'])
@@ -33,16 +50,32 @@ def validate(config, bit, epoch_num, best_map, net =None):
                                                                               gallery_labels.numpy())
     file_name = config['machine_name'] +'_' +config['dataset']
     model_name = config['info'] + '_' + str(bit) + '_' + str(epoch_num)
-    index = [i * 100 - 1 for i in range(1, 21)]
-    c_prec = cum_prec[index]
-    res = c_prec.tolist() + [mAP]
-    results_to_excel(res, filename=file_name, model_name=model_name, sheet_name='prec_map')
-    results_to_excel(prec, filename=file_name, model_name=model_name, sheet_name='prec')
-    results_to_excel(recall, filename=file_name, model_name=model_name, sheet_name='recall')
+    index_range = num_dataset // 100
+    index = [i * 100 - 1 for i in range(1, index_range+1)]
+
+    max_index = max(index)
+    overflow = num_dataset - index_range * 100
+    index = index + [max_index + i  for i in range(1,overflow + 1)]
+    print("the length of the index is", len(index))
+    print("the final index is", index[1287])
+    print("the length of the recall array", len(cum_recall))
+    print("the final item of cum_recall", cum_recall[-1])
+    print("the last ten item of idex", index[-10:])
+    c_prec = cum_prec[index].tolist()
+    c_recall = cum_recall[index].tolist()
+    print("the length of the c_recall array", len(c_recall))
+    print("the last recall is",c_recall[-1])
+    print("the last index is",index[-1])
+
+    results_to_txt([mAP], filename=file_name, model_name=model_name, sheet_name='map')
+    results_to_txt(c_prec, filename=file_name, model_name=model_name, sheet_name='prec_cum')
+    results_to_txt(c_recall, filename=file_name, model_name=model_name, sheet_name='recall_cum')
+    results_to_txt(prec.tolist(), filename=file_name, model_name=model_name, sheet_name='prec')
+    results_to_txt(recall.tolist(), filename=file_name, model_name=model_name, sheet_name='recall')
 
 
 
-    if mAP > best_map:
+    if mAP > best_map :
 
         if "save_path" in config:
             if not os.path.exists(config["save_path"]):
